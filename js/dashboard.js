@@ -56,27 +56,42 @@ const elements = {
 /**
  * Inicialització
  */
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     // Obtenir ID de l'escola de la URL o deduir-lo del nom del fitxer HTML
     const urlParams = new URLSearchParams(window.location.search);
-    currentSchoolId = urlParams.get('id') || document.body.dataset.school || null;
+    currentSchoolId = urlParams.get('id');
+
+    try {
+        await Stations.load();
+    } catch (e) {
+        showError('No s\'ha pogut carregar el registre d\'estacions.');
+        return;
+    }
     if (!currentSchoolId) {
-        // Pàgines antigues sense data-school: deduir-ho pel nom del fitxer (config.schools[].page)
-        const file = window.location.pathname.split('/').pop();
-        const match = Object.values(CONFIG.schools).find(sc => sc.page === file);
-        currentSchoolId = match ? match.id : 'escola1';
+        // Sense ?id= → primera estació activa (o tornem a la portada si no n'hi ha)
+        const first = Stations.list()[0];
+        if (!first) { window.location.href = 'index.html'; return; }
+        currentSchoolId = first.id;
     }
     
     // Verificar que l'escola existeix
-    currentSchool = CONFIG.schools[currentSchoolId];
+    currentSchool = Stations.get(currentSchoolId);
     if (!currentSchool) {
-        showError('Escola no trobada. Tornant a l\'inici...');
+        showError('Estació no trobada. Tornant a l\'inici...');
         setTimeout(() => window.location.href = 'index.html', 2000);
         return;
     }
     
     // Actualitzar títol de la pàgina
     document.title = `${currentSchool.name} | Meteo:bit`;
+
+    // Estacions de perfil "personalitzat": els camps es dedueixen dels noms del canal
+    try {
+        await Stations.ensureFields(currentSchool);
+    } catch (e) {
+        showError(`No s'ha pogut llegir el canal de ThingSpeak (${e.message}). Comprova que és públic.`);
+        return;
+    }
     
     // Inicialitzar UI
     initializeUI();
@@ -179,8 +194,8 @@ async function loadData({ silent = false } = {}) {
     if (currentRange !== 'custom' && currentRange !== 'yesterday') endDate = new Date();
     
     try {
-        // Obtenir dades de ThingSpeak (amb mitjanes automàtiques per a rangs llargs)
-        let data = await thingSpeakService.fetchChannelData(currentSchoolId, startDate, endDate);
+        // Temps real (ThingSpeak) o històric (full de càlcul) segons el rang
+        let data = await dataSource.fetch(currentSchoolId, startDate, endDate);
         if (requestId !== lastRequestId) return;  // resposta obsoleta
         
         // Filtrar per dates si cal

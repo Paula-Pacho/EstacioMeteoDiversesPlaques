@@ -1,0 +1,98 @@
+{
+  "stations": [
+    {
+      "id": "castellot",
+      "name": "Escola El Castellot",
+      "location": "Castellví de la Marca",
+      "comarca": "Alt Penedès",
+      "website": "https://agora.xtec.cat/ceipelcastellot/",
+      "lat": 41.3416,
+      "lng": 1.6356,
+      "profile": "microbit-iot",
+      "channelId": "3185873",
+      "icon": "🏰"
+    },
+    {
+      "id": "mar-i-cel",
+      "name": "Escola Mar i Cel",
+      "location": "Cubelles",
+      "comarca": "Garraf",
+      "website": "https://agora.xtec.cat/ceipmaricel/",
+      "lat": 41.2222,
+      "lng": 1.694,
+      "profile": "personalitzat",
+      "channelId": "3253909",
+      "icon": "🍃",
+      "fields": {
+        "field1": {
+          "type": "light"
+        },
+        "field2": {
+          "type": "humidity",
+          "name": "Humitat Relativa"
+        },
+        "field3": {
+          "type": "temperature"
+        },
+        "field4": {
+          "type": "dust",
+          "name": "Pols",
+          "unit": "μg/m³"
+        }
+      }
+    },
+    {
+      "id": "mas-i-perera",
+      "name": "Escola Mas i Perera",
+      "location": "Vilafranca del Penedès",
+      "comarca": "Alt Penedès",
+      "website": "https://agora.xtec.cat/ceip-masiperera/",
+      "lat": 41.3632,
+      "lng": 1.7129,
+      "profile": "personalitzat",
+      "channelId": "3262256",
+      "icon": "🌻",
+      "fields": {
+        "field1": {
+          "type": "temperature"
+        },
+        "field2": {
+          "type": "humidity"
+        },
+        "field3": {
+          "type": "light"
+        },
+        "field4": {
+          "type": "pressure",
+          "name": "Pressió Atmosfèrica"
+        }
+      }
+    },
+    {
+      "id": "citilab",
+      "name": "Citilab",
+      "location": "Cornellà de Llobregat",
+      "comarca": "Baix Llobregat",
+      "website": "https://citilab.eu",
+      "lat": 41.3557,
+      "lng": 2.0704,
+      "profile": "personalitzat",
+      "channelId": "3385483",
+      "icon": "🔬",
+      "fields": {
+        "field1": {
+          "type": "temperature"
+        },
+        "field2": {
+          "type": "humidity"
+        },
+        "field3": {
+          "type": "light"
+        },
+        "field4": {
+          "type": "pressure"
+        }
+      }
+    }
+  ]
+}

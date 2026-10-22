@@ -119,17 +119,25 @@ class CataloniaMap {
             maxLng: 3.35
         };
         
-        this.currentSensor = 'field1'; // Temperatura per defecte
-        this.schoolData = {};
+        this.currentSensor = 'temperature'; // Temperatura per defecte
+        this.stationData = {};
         this.markers = [];
         
-        this.sensorConfig = {
-            field1: { name: 'Temperatura', unit: '°C', icon: '🌡️', colorScale: ['#3B82F6', '#10B981', '#FBBF24', '#F97316', '#EF4444'] },
-            field2: { name: 'Humitat', unit: '%', icon: '💧', colorScale: ['#FEE2E2', '#BFDBFE', '#93C5FD', '#3B82F6', '#1E40AF'] },
-            field3: { name: 'Lluminositat', unit: '%', icon: '☀️', colorScale: ['#FFF9C4', '#FFF176', '#FFEB3B', '#FDD835', '#F9A825'] },
-            field4: { name: 'Pressió', unit: 'hPa', icon: '📊', colorScale: ['#D1FAE5', '#6EE7B7', '#34D399', '#10B981', '#047857'] },
-            field5: { name: 'Vent', unit: 'km/h', icon: '💨', colorScale: ['#E0E7FF', '#A5B4FC', '#818CF8', '#6366F1', '#4338CA'] }
+        // Escales de color per tipus de magnitud (nom, unitat i icona surten de FIELD_TYPES)
+        const scales = {
+            temperature: ['#3B82F6', '#10B981', '#FBBF24', '#F97316', '#EF4444'],
+            humidity:    ['#FEE2E2', '#BFDBFE', '#93C5FD', '#3B82F6', '#1E40AF'],
+            light:       ['#FFF9C4', '#FFF176', '#FFEB3B', '#FDD835', '#F9A825'],
+            pressure:    ['#D1FAE5', '#6EE7B7', '#34D399', '#10B981', '#047857'],
+            wind:        ['#E0E7FF', '#A5B4FC', '#818CF8', '#6366F1', '#4338CA'],
+            rain:        ['#E0F2FE', '#7DD3FC', '#38BDF8', '#0284C7', '#075985'],
+            dust:        ['#F3F4F6', '#D1D5DB', '#9CA3AF', '#6B7280', '#374151'],
         };
+        this.sensorConfig = {};
+        for (const [type, colorScale] of Object.entries(scales)) {
+            const t = FIELD_TYPES[type];
+            this.sensorConfig[type] = { name: t.name, unit: t.unit, icon: t.icon, decimals: t.decimals, colorScale };
+        }
         
         this.init();
     }
@@ -307,11 +315,8 @@ class CataloniaMap {
                     <p>Visualització en temps real de les estacions meteorològiques</p>
                 </div>
                 <div class="sensor-selector">
-                    <button class="sensor-btn active" data-sensor="field1"><span>🌡️</span><span>Temperatura</span></button>
-                    <button class="sensor-btn" data-sensor="field2"><span>💧</span><span>Humitat</span></button>
-                    <button class="sensor-btn" data-sensor="field3"><span>☀️</span><span>Lluminositat</span></button>
-                    <button class="sensor-btn" data-sensor="field4"><span>📊</span><span>Pressió</span></button>
-                    <button class="sensor-btn" data-sensor="field5"><span>💨</span><span>Vent</span></button>
+                    ${Object.entries(this.sensorConfig).map(([type, c]) => `
+                    <button class="sensor-btn${type === this.currentSensor ? ' active' : ''}" data-sensor="${type}"><span>${c.icon}</span><span>${c.name}</span></button>`).join('')}
                 </div>
                 <div class="map-container">
                     <div id="catalunya-svg-container"></div>
@@ -325,7 +330,7 @@ class CataloniaMap {
                     </div>
                 </div>
                 <div class="map-info" id="map-info">
-                    <p>Fes clic a una escola per veure més detalls</p>
+                    <p>Fes clic a una estació per veure més detalls</p>
                 </div>
             </div>
         `;
@@ -345,44 +350,36 @@ class CataloniaMap {
     }
     
     async loadData() {
-        const schools = CONFIG.schools;
-        this.schoolData = {};
-        // DEMO MODE: use DemoDataGenerator
-        if (typeof DemoDataGenerator !== 'undefined' && DemoDataGenerator.isEnabled()) {
-            for (const [schoolId, school] of Object.entries(schools)) {
-                if (!school.active) continue;
-                try {
-                    const demoData = DemoDataGenerator.generateSchoolData(schoolId, new Date(Date.now() - 24 * 60 * 60 * 1000), new Date());
-                    if (demoData && demoData.feeds) {
-                        this.schoolData[schoolId] = demoData;
-                    }
-                } catch (e) {
-                    console.warn(`Could not load demo data for ${schoolId}:`, e);
-                }
+        await Stations.load();
+        this.stationData = {};
+        const stations = Stations.list();
+        this.renderStationList(stations);
+
+        // Una sola petició lleugera per estació (última lectura), totes en paral·lel
+        await Promise.all(stations.map(async (station) => {
+            try {
+                const entry = await thingSpeakService.fetchLastEntry(station.id);
+                if (entry) this.stationData[station.id] = { feeds: [entry] };
+            } catch (e) {
+                console.warn(`Sense dades de ${station.id}:`, e.message);
             }
-        } else {
-            // NON-DEMO MODE: use ThingSpeak service (same as dashboard and status indicators)
-            if (typeof thingSpeakService !== 'undefined') {
-                const now = new Date();
-                const startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000); // Last 24 hours
-                
-                for (const [schoolId, school] of Object.entries(schools)) {
-                    if (!school.active) continue;
-                    if (!['escola1', 'escola4', 'escola6', 'escola7'].includes(schoolId)) continue;
-                    try {
-                        // Use the same data source as dashboard and status indicators
-                        const data = await thingSpeakService.fetchChannelData(schoolId, startDate, now);
-                        if (data && data.feeds && data.feeds.length > 0) {
-                            this.schoolData[schoolId] = data;
-                        }
-                    } catch (e) {
-                        console.warn(`Could not load data for ${schoolId}:`, e);
-                    }
-                }
-            }
-        }
+        }));
+
         this.createMarkers();
         this.updateMarkers();
+    }
+
+    /** Llista única d'estacions (substitueix les llistes duplicades de la portada) */
+    renderStationList(stations) {
+        const list = document.getElementById('school-list');
+        if (!list) return;
+        list.innerHTML = stations.map(st => `
+            <li data-station-id="${st.id}">
+                <a class="school-name" href="estacio.html?id=${encodeURIComponent(st.id)}">${st.icon} ${st.name}</a>
+                <span style="color:#9ca3af;font-size:0.9em;"> · ${st.location}</span>:
+                <span class="school-status-value"></span>
+            </li>`).join('');
+        document.dispatchEvent(new CustomEvent('stations-rendered', { detail: { count: stations.length } }));
     }
     
     addZoomControls(container) {
@@ -580,9 +577,10 @@ class CataloniaMap {
         });
     }
     
-    latLngToXY(lat, lng, schoolId = null) {
-        // Apply offset to move markers north and east (except for Santa Coloma and ZER Moianès)
-        if (schoolId !== 'escola3' && schoolId !== 'escola5') {
+    latLngToXY(lat, lng) {
+        // Correcció de calibratge del SVG a la zona sud (Penedès, Garraf, Baix Llobregat):
+        // abans s'aplicava per identificador d'escola, ara per latitud (< 41,6 °N).
+        if (lat < 41.6) {
             lat = lat + 0.0152;
             lng = lng + 0.1153;
         }
@@ -622,21 +620,14 @@ class CataloniaMap {
         }
         
         markersGroup.innerHTML = '';
-        const schools = CONFIG.schools;
+        this.markers = [];
         
-        console.log('Creating markers for schools...');
-        
-        for (const [schoolId, school] of Object.entries(schools)) {
-            if (!school.active || !school.coordinates) {
-                console.log(`Skipping ${schoolId} - active: ${school.active}, has coords: ${!!school.coordinates}`);
-                continue;
-            }
-            const { x, y } = this.latLngToXY(school.coordinates.lat, school.coordinates.lng, schoolId);
-            console.log(`${school.name}: lat=${school.coordinates.lat}, lng=${school.coordinates.lng} -> x=${x}, y=${y}`);
-            const fullName = school.name;
+        for (const station of Stations.list()) {
+            if (!station.coordinates) continue;
+            const { x, y } = this.latLngToXY(station.coordinates.lat, station.coordinates.lng);
             const marker = document.createElementNS('http://www.w3.org/2000/svg', 'g');
             marker.setAttribute('class', 'map-marker');
-            marker.setAttribute('data-school', schoolId);
+            marker.setAttribute('data-station', station.id);
             marker.setAttribute('transform', `translate(${x}, ${y})`);
             marker.setAttribute('data-base-transform', `translate(${x}, ${y})`);
             marker.innerHTML = `
@@ -648,110 +639,92 @@ class CataloniaMap {
                     <circle class="marker-bg" r="16" fill="currentColor" filter="url(#markerShadow)"/>
                     <circle class="marker-inner" r="13" fill="white"/>
                     <text class="marker-value" y="4" text-anchor="middle" font-size="10" font-weight="700" fill="#1f2937">--</text>
-                    <text class="marker-label" y="32" text-anchor="middle" font-size="9" font-weight="600" fill="#1f2937">${fullName}</text>
+                    <text class="marker-label" y="32" text-anchor="middle" font-size="9" font-weight="600" fill="#1f2937"></text>
                 </g>
             `;
-            marker.addEventListener('click', () => this.showSchoolInfo(schoolId));
+            marker.querySelector('.marker-label').textContent = station.name;
+            marker.addEventListener('click', () => this.showStationInfo(station.id));
             marker.style.cursor = 'pointer';
             markersGroup.appendChild(marker);
-            this.markers.push({ element: marker, schoolId });
+            this.markers.push({ element: marker, stationId: station.id });
         }
         this.updateMarkerScales();
-        
-        console.log(`Created ${this.markers.length} markers`);
     }
     
-    updateMarkers() {
-        const config = this.sensorConfig[this.currentSensor];
-        const now = Date.now();
+    /** Última lectura (≤ 24 h) d'un tipus de magnitud per a una estació */
+    latestValue(stationId, type) {
+        const station = Stations.get(stationId);
+        const feeds = this.stationData[stationId]?.feeds || [];
+        const key = Stations.fieldKeyFor(station, type);
+        if (!key) return { value: null, timestamp: null, hasField: false };
         const DAY_MS = 24 * 60 * 60 * 1000;
-        // For each school, find latest value within 24h for the selected field
-        const schoolList = [];
-        const values = this.markers.map(({ schoolId }) => {
-            const school = CONFIG.schools[schoolId];
-            let value = null;
-            let timestamp = null;
-            if (school && this.schoolData[schoolId] && this.schoolData[schoolId].feeds) {
-                const feeds = this.schoolData[schoolId].feeds;
-                for (let i = feeds.length - 1; i >= 0; i--) {
-                    const feed = feeds[i];
-                    // Support both 'timestamp' and 'created_at' fields
-                    const feedTime = feed.timestamp || feed.created_at;
-                    if (!feedTime) continue;
-                    const t = new Date(feedTime).getTime();
-                    if (now - t <= DAY_MS && feed[this.currentSensor] !== undefined && feed[this.currentSensor] !== null) {
-                        value = feed[this.currentSensor];
-                        timestamp = feedTime;
-                        break;
-                    }
-                }
+        for (let i = feeds.length - 1; i >= 0; i--) {
+            const feed = feeds[i];
+            const feedTime = feed.timestamp || feed.created_at;
+            if (!feedTime) continue;
+            const v = feed[key];
+            if (Date.now() - new Date(feedTime).getTime() <= DAY_MS && v !== undefined && v !== null) {
+                return { value: v, timestamp: feedTime, hasField: true };
             }
-            schoolList.push({
-                schoolId,
-                name: school?.name || schoolId,
-                value,
-                timestamp
-            });
-            return { schoolId, value, timestamp };
-        });
+        }
+        return { value: null, timestamp: null, hasField: true };
+    }
 
-        // Only show markers for schools with value in 24h
+    updateMarkers() {
+        const type = this.currentSensor;
+        const config = this.sensorConfig[type];
+        const demo = typeof DemoDataGenerator !== 'undefined' && DemoDataGenerator.isEnabled();
+
+        const values = this.markers.map(({ stationId }) => ({ stationId, ...this.latestValue(stationId, type) }));
         const validValues = values.filter(v => v.value !== null && v.value !== undefined);
+
         if (validValues.length === 0) {
-            this.markers.forEach(({ element }) => {
-                element.style.display = 'none';
-            });
+            this.markers.forEach(({ element }) => { element.style.display = 'none'; });
         } else {
             const minVal = Math.min(...validValues.map(v => v.value));
             const maxVal = Math.max(...validValues.map(v => v.value));
             this.updateLegend(minVal, maxVal, config);
-            this.markers.forEach(({ element, schoolId }) => {
-                const found = validValues.find(v => v.schoolId === schoolId);
+            this.markers.forEach(({ element, stationId }) => {
+                const found = validValues.find(v => v.stationId === stationId);
                 if (!found) {
                     element.style.display = 'none';
                     return;
                 }
                 element.style.display = '';
-                const value = found.value;
-                const color = this.getColorForValue(value, minVal, maxVal, config.colorScale);
+                const color = this.getColorForValue(found.value, minVal, maxVal, config.colorScale);
                 const contrastColor = this.getContrastColor(color);
                 const valueText = element.querySelector('.marker-value');
-                const markerBg = element.querySelector('.marker-bg');
-                const markerInner = element.querySelector('.marker-inner');
-                const pulse = element.querySelector('.marker-pulse');
-                const decimals = this.currentSensor === 'field3' ? 0 : 1;
-                const formattedValue = this.formatNumber(value, decimals);
                 if (valueText) {
-                    valueText.textContent = formattedValue;
+                    valueText.textContent = this.formatNumber(found.value, config.decimals);
                     valueText.setAttribute('fill', contrastColor);
                 }
-                if (markerBg) markerBg.setAttribute('fill', color);
-                if (markerInner) markerInner.setAttribute('fill', color);
-                if (pulse) pulse.setAttribute('stroke', color);
+                element.querySelector('.marker-bg')?.setAttribute('fill', color);
+                element.querySelector('.marker-inner')?.setAttribute('fill', color);
+                element.querySelector('.marker-pulse')?.setAttribute('stroke', color);
                 element.style.color = color;
             });
         }
 
-        // Update school list hero panel (update values in place only)
-        const schoolListElem = document.getElementById('school-list');
-        if (schoolListElem) {
-            schoolList.forEach(({ schoolId, value, timestamp }) => {
-                const valueSpan = schoolListElem.querySelector(`li[data-school-id="${schoolId}"] .school-status-value`);
-                if (!valueSpan) return;
-                let statusHtml = '';
-                if (value !== null && value !== undefined) {
-                    const d = new Date(timestamp);
-                    const decimals = this.currentSensor === 'field2' || this.currentSensor === 'field3' ? 0 : 1;
-                    statusHtml = `<span style="color:#22c55e;font-weight:600;">${this.formatNumber(value, decimals)} ${config.unit}</span> <span style="color:#aaa;font-size:0.92em;">(${d.toLocaleString('ca-ES', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: '2-digit' })})</span>`;
-                } else if (schoolId !== 'escola1' && !(typeof DemoDataGenerator !== 'undefined' && DemoDataGenerator.isEnabled())) {
-                    statusHtml = `<span style="color:#ef4444;font-weight:600;">No connectat</span>`;
-                } else if (typeof DemoDataGenerator !== 'undefined' && DemoDataGenerator.isEnabled()) {
-                    statusHtml = `<span style="color:#facc15;font-weight:600;">Mode demo</span>`;
-                } else {
-                    statusHtml = `<span style="color:#ef4444;font-weight:600;">dada no disponible</span>`;
-                }
-                valueSpan.innerHTML = statusHtml;
-            });
+        // Llista d'estacions: valor actual o motiu per què no n'hi ha
+        const listElem = document.getElementById('school-list');
+        if (listElem) {
+            values.concat(Stations.list().filter(st => !st.coordinates).map(st => ({ stationId: st.id, ...this.latestValue(st.id, type) })))
+                .forEach(({ stationId, value, timestamp, hasField }) => {
+                    const span = listElem.querySelector(`li[data-station-id="${stationId}"] .school-status-value`);
+                    if (!span) return;
+                    if (value !== null && value !== undefined) {
+                        const d = new Date(timestamp).toLocaleString('ca-ES', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
+                        span.innerHTML = `<span style="color:#22c55e;font-weight:600;">${this.formatNumber(value, config.decimals)} ${config.unit}</span> <span style="color:#aaa;font-size:0.92em;">(${d})</span>`;
+                    } else if (demo) {
+                        span.innerHTML = '<span style="color:#facc15;font-weight:600;">Mode demo</span>';
+                    } else if (!hasField) {
+                        span.innerHTML = '<span style="color:#9ca3af;">no mesura aquesta magnitud</span>';
+                    } else if (!this.stationData[stationId]) {
+                        span.innerHTML = '<span style="color:#ef4444;font-weight:600;">fora de servei</span>';
+                    } else {
+                        span.innerHTML = '<span style="color:#ef4444;font-weight:600;">sense dades recents</span>';
+                    }
+                });
         }
     }
     
@@ -799,96 +772,52 @@ class CataloniaMap {
         }
     }
     
-    showSchoolInfo(schoolId) {
-        const school = CONFIG.schools[schoolId];
-        const data = this.schoolData[schoolId];
+    showStationInfo(stationId) {
+        const station = Stations.get(stationId);
+        const data = this.stationData[stationId];
         const infoBox = document.getElementById('map-info');
-        if (!school || !data || !infoBox) return;
+        if (!station || !infoBox) return;
 
-        // Find latest value/timestamp for each field within 24h
-        const now = Date.now();
-        const DAY_MS = 24 * 60 * 60 * 1000;
-        let feeds = data.feeds || [];
-        function latestFieldValue(field) {
-            for (let i = feeds.length - 1; i >= 0; i--) {
-                const feed = feeds[i];
-                // Support both 'timestamp' and 'created_at' fields
-                const feedTime = feed.timestamp || feed.created_at;
-                if (!feedTime) continue;
-                const t = new Date(feedTime).getTime();
-                if (now - t <= DAY_MS && feed[field] !== undefined && feed[field] !== null) {
-                    return { value: feed[field], timestamp: feedTime };
-                }
-            }
-            // fallback for demo/simple data
-            if (data[field] !== undefined) {
-                return { value: data[field], timestamp: null };
-            }
-            return { value: null, timestamp: null };
-        }
+        const formatTs = (ts) => ts
+            ? new Date(ts).toLocaleString('ca-ES', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: '2-digit' })
+            : '<span style="color:#aaa">no disponible</span>';
 
-        // Generate friendly school URL
-        let schoolUrl = '';
-        switch (schoolId) {
-            case 'escola1': schoolUrl = 'escola-el-castellot.html'; break;
-            case 'escola2': schoolUrl = 'escola-jaume-balmes.html'; break;
-            case 'escola3': schoolUrl = 'escola-santa-coloma.html'; break;
-            case 'escola4': schoolUrl = 'escola-mar-i-cel.html'; break;
-            case 'escola5': schoolUrl = 'zer-moianes.html'; break;
-            case 'escola6': schoolUrl = 'escola-mas-i-perera.html'; break;
-            default: schoolUrl = 'escola.html?id=' + schoolId;
-        }
-        // Helper to format timestamp
-        function formatTs(ts) {
-            if (!ts) return '<span style="color:#aaa">no disponible</span>';
-            const d = new Date(ts);
-            return d.toLocaleString('ca-ES', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: '2-digit' });
-        }
+        // Una fila per cada camp que té aquesta estació (sigui del tipus que sigui)
+        const feed = data?.feeds?.[data.feeds.length - 1];
+        const rows = Object.entries(station.fields || {}).map(([key, f]) => {
+            const v = feed ? feed[key] : null;
+            const text = v === null || v === undefined ? '--' : `${this.formatNumber(v, f.decimals ?? 1)} ${f.unit}`;
+            return `
+                <div class="info-value">
+                    <span>${f.icon}</span>
+                    <span>${text}</span>
+                    <span class="info-ts">${feed && v != null ? formatTs(feed.timestamp || feed.created_at) : formatTs(null)}</span>
+                </div>`;
+        }).join('');
+
         infoBox.innerHTML = `
             <div class="school-info-card">
                 <div class="school-info-header">
-                    <span class="school-icon">${school.icon}</span>
+                    <span class="school-icon"></span>
                     <div>
-                        <h4>${school.name}</h4>
-                        <p>${school.location}</p>
+                        <h4></h4>
+                        <p></p>
                     </div>
                 </div>
-                <div class="school-info-values">
-                    <div class="info-value">
-                        <span>🌡️</span>
-                        <span>${this.formatNumber(latestFieldValue('field1').value, 1)}°C</span>
-                        <span class="info-ts">${formatTs(latestFieldValue('field1').timestamp)}</span>
-                    </div>
-                    <div class="info-value">
-                        <span>💧</span>
-                        <span>${this.formatNumber(latestFieldValue('field2').value, 0)}%</span>
-                        <span class="info-ts">${formatTs(latestFieldValue('field2').timestamp)}</span>
-                    </div>
-                    <div class="info-value">
-                        <span>☀️</span>
-                        <span>${this.formatNumber(latestFieldValue('field3').value, 0)}%</span>
-                        <span class="info-ts">${formatTs(latestFieldValue('field3').timestamp)}</span>
-                    </div>
-                    <div class="info-value">
-                        <span>📊</span>
-                        <span>${this.formatNumber(latestFieldValue('field4').value, 0)} hPa</span>
-                        <span class="info-ts">${formatTs(latestFieldValue('field4').timestamp)}</span>
-                    </div>
-                    <div class="info-value">
-                        <span>💨</span>
-                        <span>${this.formatNumber(latestFieldValue('field5').value, 1)} km/h</span>
-                        <span class="info-ts">${formatTs(latestFieldValue('field5').timestamp)}</span>
-                    </div>
-                </div>
-                <a href="${schoolUrl}" class="view-data-btn" style="margin-top: 16px; display: inline-flex; text-align: center; justify-content: center; width: 100%;">
+                <div class="school-info-values">${rows}</div>
+                <a href="estacio.html?id=${encodeURIComponent(stationId)}" class="view-data-btn" style="margin-top: 16px; display: inline-flex; text-align: center; justify-content: center; width: 100%;">
                     Veure Dades Completes →
                 </a>
             </div>
         `;
+        // textContent per evitar HTML injectat des del registre
+        infoBox.querySelector('.school-icon').textContent = station.icon;
+        infoBox.querySelector('h4').textContent = station.name;
+        infoBox.querySelector('p').textContent = station.location;
     }
     
-    updateSchoolData(schoolId, sensorData) {
-        this.schoolData[schoolId] = sensorData;
+    updateStationData(stationId, sensorData) {
+        this.stationData[stationId] = sensorData;
         this.updateMarkers();
     }
 }

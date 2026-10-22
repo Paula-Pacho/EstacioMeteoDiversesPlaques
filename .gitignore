@@ -27,3 +27,11 @@ build/
 # Temporary files
 *.tmp
 *.temp
+
+# Claus/credencials de firmware (ESP32)
+secrets.h
+secrets.py
+*.secret
+
+# Dades pesades de la generació del mapa (no cal desplegar-les)
+tools/mapa/*.gpkg

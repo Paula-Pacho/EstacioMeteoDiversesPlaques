@@ -23,56 +23,49 @@ class ThingSpeakService {
      * @returns {Promise<Object>} - Dades del canal (combinades de múltiples requests si cal)
      */
     async fetchChannelData(schoolId, startDate = null, endDate = null) {
-        const school = CONFIG.schools[schoolId];
+        const school = Stations.get(schoolId);
         if (!school) {
-            throw new Error(`Escola no trobada: ${schoolId}`);
+            throw new Error(`Estació no trobada: ${schoolId}`);
         }
+        await Stations.ensureFields(school);
 
         // Comprovar cache primer
         const cacheKey = `${schoolId}_${startDate?.getTime()}_${endDate?.getTime()}`;
         const cached = this.getFromCache(cacheKey);
-        if (cached) {
-            console.log(`📦 Dades del cache per ${school.name}`);
-            return cached;
-        }
+        if (cached) return cached;
 
         try {
-            console.log(`🌐 Obtenint dades de ${school.name}...`);
-            
-            // Fetch all data with pagination support
             const allFeeds = await this._fetchAllChannelFeeds(school, startDate, endDate);
-            
-            // Processar i normalitzar les dades
-            const data = {
-                channel: allFeeds.channel || {},
-                school: school,
-                feeds: allFeeds.feeds || [],
-                fieldData: {},
-                stats: {}
-            };
-            
-            // Separar dades per camp
-            Object.keys(school.fields).forEach(fieldKey => {
-                data.fieldData[fieldKey] = {
-                    ...school.fields[fieldKey],
-                    data: allFeeds.feeds.map(feed => ({
-                        timestamp: feed.timestamp,
-                        value: feed[fieldKey]
-                    })).filter(item => item.value !== null && item.value !== undefined)
-                };
-            });
-
-            // Calcular estadístiques
-            data.stats = this.calculateStats(allFeeds.feeds, school);
-            
-            // Guardar al cache
+            const data = this.buildDataset(school, allFeeds.feeds || [], allFeeds.channel);
             this.saveToCache(cacheKey, data);
-            
             return data;
         } catch (error) {
             console.error(`❌ Error obtenint dades de ${school.name}:`, error);
             throw error;
         }
+    }
+
+    /**
+     * Construeix l'objecte de dades que consumeix el dashboard
+     * a partir d'una llista d'entrades ja processades (processEntry).
+     */
+    buildDataset(school, feeds, channel = {}) {
+        const fieldData = {};
+        Object.keys(school.fields).forEach(fieldKey => {
+            fieldData[fieldKey] = {
+                ...school.fields[fieldKey],
+                data: feeds
+                    .map(feed => ({ timestamp: feed.timestamp, value: feed[fieldKey] }))
+                    .filter(item => item.value !== null && item.value !== undefined)
+            };
+        });
+        return {
+            channel: channel || {},
+            school: school,
+            feeds: feeds,
+            fieldData: fieldData,
+            stats: this.calculateStats(feeds, school)
+        };
     }
 
     /**
@@ -100,12 +93,12 @@ class ThingSpeakService {
      * serveix per paginar.)
      * @private
      */
-    async _fetchAllChannelFeeds(school, startDate, endDate) {
+    async _fetchAllChannelFeeds(school, startDate, endDate, forceAverage = null) {
         const { channelId, readApiKey } = school.thingspeak;
         const baseUrl = `${this.baseUrl}/channels/${channelId}/feeds.json`;
         const pageSize = CONFIG.thingspeak.resultsPerRequest;
         const maxPages = CONFIG.thingspeak.maxPages || 10;
-        const average = this.getAverageMinutes(startDate, endDate);
+        const average = forceAverage || this.getAverageMinutes(startDate, endDate);
 
         const allFeeds = [];
         let channel = {};
@@ -163,10 +156,12 @@ class ThingSpeakService {
      * @returns {Promise<Object>} - Última lectura
      */
     async fetchLastEntry(schoolId) {
-        const school = CONFIG.schools[schoolId];
+        const school = Stations.get(schoolId);
         if (!school) {
-            throw new Error(`Escola no trobada: ${schoolId}`);
+            throw new Error(`Estació no trobada: ${schoolId}`);
         }
+
+        await Stations.ensureFields(school);
 
         const { channelId, readApiKey } = school.thingspeak;
         const url = `${this.baseUrl}/channels/${channelId}/feeds/last.json${this.keyQuery(readApiKey)}`;
@@ -191,9 +186,9 @@ class ThingSpeakService {
      * @returns {Promise<Object>} - Informació del canal
      */
     async fetchChannelInfo(schoolId) {
-        const school = CONFIG.schools[schoolId];
+        const school = Stations.get(schoolId);
         if (!school) {
-            throw new Error(`Escola no trobada: ${schoolId}`);
+            throw new Error(`Estació no trobada: ${schoolId}`);
         }
 
         const { channelId, readApiKey } = school.thingspeak;
@@ -210,44 +205,6 @@ class ThingSpeakService {
             console.error(`❌ Error obtenint info del canal de ${school.name}:`, error);
             throw error;
         }
-    }
-
-    /**
-     * Processa les dades del canal i les normalitza
-     */
-    processChannelData(data, school) {
-        const channel = data.channel || {};
-        const feeds = data.feeds || [];
-        
-        // Processar cada entrada
-        const processedFeeds = feeds.map(feed => this.processEntry(feed, school));
-        
-        // Separar dades per camp
-        const fieldData = {};
-        Object.keys(school.fields).forEach(fieldKey => {
-            fieldData[fieldKey] = {
-                ...school.fields[fieldKey],
-                data: processedFeeds.map(feed => ({
-                    timestamp: feed.timestamp,
-                    value: feed[fieldKey]
-                })).filter(item => item.value !== null && item.value !== undefined)
-            };
-        });
-
-        return {
-            channel: {
-                id: channel.id,
-                name: channel.name || school.name,
-                description: channel.description || school.description,
-                created_at: channel.created_at,
-                updated_at: channel.updated_at,
-                last_entry_id: channel.last_entry_id
-            },
-            school: school,
-            feeds: processedFeeds,
-            fieldData: fieldData,
-            stats: this.calculateStats(processedFeeds, school)
-        };
     }
 
     /**
@@ -277,13 +234,9 @@ class ThingSpeakService {
         return processed;
     }
 
-    /**
-     * Factor d'escala d'un camp. Per compatibilitat, el vent sense `scale`
-     * explícit es tracta com a cm/h (kit micro:bit) i es divideix per 100.
-     */
+    /** Factor d'escala d'un camp (p. ex. vent del kit micro:bit en cm/h → 0.01). Per defecte 1. */
     getFieldScale(field) {
-        if (field && typeof field.scale === 'number') return field.scale;
-        return field && field.type === 'wind' ? 0.01 : 1;
+        return field && typeof field.scale === 'number' ? field.scale : 1;
     }
 
     /**
@@ -320,7 +273,7 @@ class ThingSpeakService {
 
     /** Un canal està configurat si té un channelId real */
     isConfigured(schoolId) {
-        const ts = CONFIG.schools[schoolId]?.thingspeak;
+        const ts = Stations.get(schoolId)?.thingspeak;
         return !!ts && !!ts.channelId && !String(ts.channelId).startsWith('YOUR_');
     }
 
