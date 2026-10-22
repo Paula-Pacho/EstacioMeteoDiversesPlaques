@@ -19,9 +19,9 @@ const CONFIG = {
         // URL de l'aplicació web d'Apps Script (acaba en /exec). Serveix el
         // registre d'estacions (?action=stations) i l'històric (?action=history).
         // Buida = mode local: s'usa data/stations.json i no hi ha històric.
-        url: '',
+        url: 'https://script.google.com/macros/s/AKfycbxc3ABXa7gEGNISD2muJ3c-zPvfkczqpE2cefziiH-uGTHvYRIRGy3Rh1hrC-SyicOa/exec',
         // URL del Google Form d'alta d'estacions (la de "incrustar", amb ?embedded=true)
-        formUrl: '',
+        formUrl: 'https://docs.google.com/forms/d/e/1FAIpQLSczdOsUD-_hBLeXFSfCbdwRawMCyGHwxrtDB2ZTwSuyWIlFpw/viewform?embedded=true',
         // Cache local del registre d'estacions (ms)
         registryCacheTtl: 10 * 60 * 1000,
     },
