@@ -1,6 +1,6 @@
 # Valoració: estacions meteorològiques amb ESP32
 
-*Document de treball · 22 d'octubre de 2026 · Projecte Meteo:bit (mentoria 4.0)*
+*Document de treball · 22 d'octubre de 2026 · Projecte Estacions Meteorològiques en Xarxa (mentoria 4.0)*
 
 > Els preus, límits de ThingSpeak i compatibilitats de programari d'aquest document són **orientatius i no s'han verificat avui**. Cal comprovar-los abans de comprar o fer comandes (vegeu l'apartat 12).
 

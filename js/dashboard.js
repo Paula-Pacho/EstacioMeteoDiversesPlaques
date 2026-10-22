@@ -83,7 +83,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     
     // Actualitzar títol de la pàgina
-    document.title = `${currentSchool.name} | Meteo:bit`;
+    document.title = `${currentSchool.name} | Estacions Meteorològiques en Xarxa`;
 
     // Estacions de perfil "personalitzat": els camps es dedueixen dels noms del canal
     try {
@@ -608,13 +608,6 @@ function formatDateTimeLocal(date) {
     const hours = String(date.getHours()).padStart(2, '0');
     const minutes = String(date.getMinutes()).padStart(2, '0');
     return `${year}-${month}-${day}T${hours}:${minutes}`;
-}
-
-/**
- * Toggle menú mòbil
- */
-function toggleMenu() {
-    document.getElementById('mainNav').classList.toggle('open');
 }
 
 // Netejar quan es tanca la pàgina

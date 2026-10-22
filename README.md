@@ -1,10 +1,11 @@
-# 🌤️ Meteo:bit — xarxa d'estacions meteorològiques de centres educatius
+# 🌤️ Estacions Meteorològiques en Xarxa
 
 Web per veure en **temps real** les dades d'estacions meteorològiques construïdes per l'alumnat (micro:bit amb extensió IoT, ESP32, altres plaques) i per **donar-ne d'alta de noves directament des de la pròpia web**. Projecte mentoria 4.0.
 
 - 🗺️ Mapa de Catalunya amb una magnitud a escollir (temperatura, humitat, llum, pressió, vent, pluja, pols).
 - 📈 Pàgina d'estació amb gràfics, rangs de dates i exportació a CSV.
 - ➕ Alta d'estacions amb formulari + comprovador de canal (`alta.html`).
+- 📚 Recursos didàctics (`recursos.html`) i formulari de contacte (`contacte.html`).
 - 🗄️ **Històric al full de càlcul de Google**: cada hora s'hi desa la mitjana de cada estació.
 - 🔌 Compatible amb qualsevol placa que enviï a **ThingSpeak** (perfils de placa a `js/boards.js`).
 
@@ -30,6 +31,9 @@ Placa (micro:bit / ESP32 / …) ──► ThingSpeak ──► Web (temps real, 
 index.html              Portada: mapa + llistat únic d'estacions
 estacio.html            Pàgina única d'estació (?id=<id>)
 alta.html               Alta d'estacions: perfils, comprovador de canal i formulari
+recursos.html           Recursos didàctics: alta, muntatge de la placa i connexió a ThingSpeak
+contacte.html           Formulari de contacte (arriba a la fulla «contactes» del full de càlcul)
+js/layout.js            Capçalera, menú i peu de pàgina compartits (s'edita en un sol lloc)
 js/config.js            Paràmetres globals (URL de l'API, ThingSpeak, mitjanes, gràfiques)
 js/boards.js            Tipus de magnitud i perfils de placa (capa de compatibilitat)
 js/stations.js          Registre d'estacions (API → còpia local → data/stations.json)
@@ -38,7 +42,9 @@ js/history-service.js   Lectura de l'històric (Apps Script)
 js/data-source.js       Decideix temps real o històric segons el rang
 js/dashboard.js, charts.js, catalonia-map.js, alta.js, demo-data.js, data-storage.js
 apps-script/            Backend de Google (Code.gs + guia d'instal·lació)
-data/stations.json      Estacions de llavor (mode local / fora de línia)
+data/stations.json      Estacions locals (mode local; buit per defecte)
+data/recursos.json      Llista de recursos addicionals de la pàgina de recursos
+assets/logos/           Logos del peu de pàgina
 data/catalunya-map.svg  Mapa base
 docs/VALORACIO_ESP32.md Valoració de plaques ESP32
 tools/mapa/             Eines per generar el mapa (no es fan servir en execució)
@@ -89,10 +95,15 @@ Afegeix `?demo=true` a qualsevol URL per veure dades simulades (no cal cap canal
 
 ## Administració (aprovar i mantenir)
 
-- Les altes arriben a la fulla **`estacions`** del full de càlcul amb estat `pendent`. Per publicar-les: canvia `estat` a `aprovada` o fes servir el menú **Meteo:bit → Aprovar les files seleccionades**.
+- Les altes arriben a la fulla **`estacions`** del full de càlcul amb estat `pendent`. Per publicar-les: canvia `estat` a `aprovada` o fes servir el menú **Estacions Meteorològiques en Xarxa → Aprovar les files seleccionades**.
 - Per donar-ne de baixa: posa `rebutjada` (les dades arxivades es conserven).
 - Les fulles `d_<id>` contenen l'històric (mitjana horària) i es poden graficar directament amb Fulls de càlcul.
 - El correu de contacte **no** surt mai per l'API.
+
+## Editar el contingut
+
+- **Menú, títol, subtítol i peu de pàgina:** `js/layout.js` (un sol lloc per a totes les pàgines).
+- **Afegir un recurs didàctic** (enllaç, PDF, vídeo): una entrada nova a `data/recursos.json`. Les guies de la pàgina de recursos són a `recursos.html`.
 
 ## Privadesa i seguretat
 
@@ -100,9 +111,9 @@ Afegeix `?demo=true` a qualsevol URL per veure dades simulades (no cal cap canal
 - Recomanat: canals de ThingSpeak **públics**; així no cal publicar cap clau. Les claus de **lectura** d'un canal privat són visibles per a qualsevol visitant. Les claus d'**escriptura** no han de passar mai per la web ni per aquest repositori.
 - No pugis a git cap fitxer amb credencials de les plaques (`secrets.h`, `secrets.py`: ja són a `.gitignore`).
 
-## Estacions de llavor
+## Mode local i demo
 
-`data/stations.json` conté les 4 estacions de l'edició anterior amb canal (El Castellot, Mar i Cel, Mas i Perera, Citilab), **sense claus de lectura**: només funcionen si els canals són públics. En producció, el registre real és el full de càlcul.
+`data/stations.json` està buit a propòsit: el registre real és el full de càlcul. Per desenvolupar sense backend, hi pots afegir estacions amb el mateix format que l'API (`id, name, location, lat, lng, profile, channelId…`). Amb `?demo=true` i sense estacions, la web crea dues estacions de prova.
 
 ## Documentació relacionada
 

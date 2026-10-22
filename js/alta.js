@@ -1,8 +1,6 @@
 /**
  * Pàgina d'alta d'estacions: perfils de placa, comprovador de canal i formulari.
  */
-function toggleMenu() { document.getElementById('mainNav').classList.toggle('open'); }
-
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---- 1. Perfils

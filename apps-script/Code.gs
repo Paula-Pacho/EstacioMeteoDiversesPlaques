@@ -8,7 +8,8 @@
  *     (fulla "estacions", estat "pendent" fins que una persona les aprova).
  *  2. Cada hora copia al full de càlcul la MITJANA HORÀRIA de cada estació
  *     aprovada (una fulla "d_<id>" per estació) → històric independent de ThingSpeak.
- *  3. Serveix a la web (aplicació web, només GET):
+ *  3. Rep els missatges del formulari de contacte de la web (POST → fulla "contactes").
+ *  4. Serveix a la web (aplicació web, GET):
  *       ?action=stations                       → registre d'estacions aprovades
  *       ?action=history&id=X&from=ISO&to=ISO   → històric d'una estació
  *
@@ -17,6 +18,7 @@
 
 // ---------- Constants ----------
 var SHEET_STATIONS = 'estacions';
+var SHEET_CONTACTS = 'contactes';
 var DATA_PREFIX = 'd_';
 var STATION_COLS = ['id', 'name', 'location', 'comarca', 'lat', 'lng', 'website', 'profile',
   'channelId', 'readApiKey', 'fields', 'estat', 'contacte', 'dataAlta', 'ultimaRecollida', 'notes'];
@@ -31,7 +33,7 @@ var STATUS = { PENDING: 'pendent', APPROVED: 'aprovada', REJECTED: 'rebutjada' }
 // ============================================================
 
 function onOpen() {
-  SpreadsheetApp.getUi().createMenu('Meteo:bit')
+  SpreadsheetApp.getUi().createMenu('Estacions en xarxa')
     .addItem('1. Configuració inicial', 'setup')
     .addItem('Aprovar les files seleccionades', 'approveSelected')
     .addItem('Recollir dades ara', 'collectAll')
@@ -46,6 +48,12 @@ function setup() {
   if (sh.getLastRow() === 0) {
     sh.getRange(1, 1, 1, STATION_COLS.length).setValues([STATION_COLS]).setFontWeight('bold');
     sh.setFrozenRows(1);
+  }
+
+  var cs = ss.getSheetByName(SHEET_CONTACTS) || ss.insertSheet(SHEET_CONTACTS);
+  if (cs.getLastRow() === 0) {
+    cs.getRange(1, 1, 1, 6).setValues([['data', 'nom', 'correu', 'motiu', 'missatge', 'estat']]).setFontWeight('bold');
+    cs.setFrozenRows(1);
   }
 
   // Activadors: recollida horària + procés del formulari
@@ -186,15 +194,20 @@ function onFormSubmit(e) {
     fields: fields, estat: estat, contacte: pick_(nv, ['correu', 'contacte', 'email']),
     dataAlta: new Date(), ultimaRecollida: '', notes: notes
   };
-  sh.appendRow(STATION_COLS.map(function (c) { return row[c]; }));
+  sh.appendRow(STATION_COLS.map(function (c) { return safe_(row[c]); }));
 
   var admin = PropertiesService.getScriptProperties().getProperty('ADMIN_EMAIL');
   if (admin) {
-    MailApp.sendEmail(admin, 'Meteo:bit — nova estació: ' + name,
+    MailApp.sendEmail(admin, 'Estacions en xarxa — nova estació: ' + name,
       'Estat: ' + estat + '\nId: ' + id + '\nCanal: ' + channelId + '\n' + notes +
       '\n\nObre el full i canvia "estat" a "aprovada" per publicar-la:\n' + ss.getUrl());
   }
   clearCache_();
+}
+
+/** Evita que un text que comença per = + - @ s'interpreti com a fórmula al full (injecció de fórmules) */
+function safe_(v) {
+  return (typeof v === 'string' && /^[=+\-@]/.test(v)) ? "'" + v : v;
 }
 
 function toNumber_(t) {
@@ -334,6 +347,48 @@ function doGet(e) {
   } catch (err) {
     return json_({ error: String(err) });
   }
+}
+
+function doPost(e) {
+  try {
+    var d = JSON.parse(e.postData.contents);
+    if (d.action === 'contact') return json_(saveContact_(d));
+    return json_({ error: 'Acció desconeguda' });
+  } catch (err) {
+    return json_({ error: String(err) });
+  }
+}
+
+function clip_(t, n) {
+  return String(t == null ? '' : t).trim().substring(0, n);
+}
+
+/** Desa un missatge del formulari de contacte i avisa l'administrador (ADMIN_EMAIL) */
+function saveContact_(d) {
+  if (d.website) return { ok: true }; // camp parany: és un robot, ho ignorem sense avisar
+  var name = clip_(d.name, 100), email = clip_(d.email, 150), topic = clip_(d.topic, 80), msg = clip_(d.message, 3000);
+  if (!name || !msg || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error('Dades incompletes');
+
+  // Límit simple anti-spam: 30 missatges per hora en total
+  var cache = CacheService.getScriptCache();
+  var n = parseInt(cache.get('contact_n') || '0', 10);
+  if (n >= 30) throw new Error('Massa missatges; torna-ho a provar més tard');
+  cache.put('contact_n', String(n + 1), 3600);
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(SHEET_CONTACTS) || ss.insertSheet(SHEET_CONTACTS);
+  sh.appendRow([new Date(), safe_(name), safe_(email), safe_(topic), safe_(msg), 'nou']);
+
+  var admin = PropertiesService.getScriptProperties().getProperty('ADMIN_EMAIL');
+  if (admin) {
+    MailApp.sendEmail({
+      to: admin,
+      replyTo: email,
+      subject: 'Estacions en xarxa — contacte: ' + topic,
+      body: 'De: ' + name + ' <' + email + '>\nMotiu: ' + topic + '\n\n' + msg
+    });
+  }
+  return { ok: true };
 }
 
 /** Només estacions aprovades i només camps públics (mai el correu de contacte ni les notes) */

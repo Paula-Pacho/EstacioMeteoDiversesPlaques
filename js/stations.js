@@ -44,6 +44,14 @@ const Stations = {
         }
         if (!raw) raw = await this._fromSeed();
 
+        // Mode demo sense estacions registrades: n'inventem dues perquè la interfície es pugui provar
+        if (!raw.length && typeof DemoDataGenerator !== 'undefined' && DemoDataGenerator.isEnabled()) {
+            raw = [
+                { id: 'demo-microbit', name: 'Estació demo micro:bit', location: 'Vilafranca del Penedès', lat: 41.3632, lng: 1.7129, profile: 'microbit-iot', channelId: 'demo', icon: '🔬' },
+                { id: 'demo-esp32', name: 'Estació demo ESP32', location: 'Girona', lat: 41.9794, lng: 2.8214, profile: 'esp32', channelId: 'demo', icon: '🛰️' },
+            ];
+        }
+
         this.map = {};
         raw.forEach((r, i) => {
             const st = this.build(r, i);

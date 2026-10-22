@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="light">
     <meta name="description" content="Xarxa d'estacions meteorològiques de centres educatius - Projecte mentoria 4.0. Dades en temps real i alta de noves plaques.">
-    <title>Meteo:bit | Projecte mentoria 4.0</title>
+    <title>Estacions Meteorològiques en Xarxa | Projecte mentoria 4.0</title>
     
     <!-- Fonts: Amulya for headings, Synonym for body -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -18,7 +18,7 @@
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌦️</text></svg>">
 </head>
-<body>
+<body data-page="inici">
     <!-- Animated Background -->
     <div class="animated-bg"></div>
     <div class="clouds">
@@ -26,46 +26,24 @@
         <div class="cloud"></div>
         <div class="cloud"></div>
     </div>
-
-
-    <!-- Header -->
-    <header class="header">
-        <div class="container">
-            <div class="header-content">
-                <a href="index.html" class="logo">
-                    <div class="logo-icon">🌦️</div>
-                    <div class="logo-text">
-                        Meteo:bit
-                        <span>Projecte mentoria 4.0</span>
-                    </div>
-                </a>
-                <button class="mobile-menu-btn" onclick="toggleMenu()" aria-label="Menú">☰</button>
-                <nav class="nav" id="mainNav">
-                    <a href="index.html" class="nav-link active">Inici</a>
-                    <a href="#estacions" class="nav-link">Estacions</a>
-                    <a href="alta.html" class="nav-link">Afegeix la teva placa</a>
-                    <a href="#projecte" class="nav-link">El Projecte</a>
-                    <a href="#contacte" class="nav-link">Contacte</a>
-                </nav>
-            </div>
-        </div>
-    </header>
+    <div id="site-header"></div>
 
     <!-- Hero -->
-    <section class="hero">
+    <section class="hero hero-compact">
         <div class="container">
-            <div class="hero-content">
-                <div class="hero-badge"><span>🧪</span><span>Projecte mentoria 4.0</span></div>
-                <h1 style="text-align: center;">Ens convertim en meteoròlegs!</h1>
-                <p>
-                    Centres educatius de Catalunya han construït les seves pròpies estacions meteorològiques
-                    amb <strong>micro:bit</strong>, <strong>ESP32</strong> i altres plaques.
-                    Consulta les dades en temps real o <a href="alta.html" style="color:inherit;font-weight:700;">afegeix la teva estació</a> a la xarxa.
-                </p>
+            <div class="hero-card">
+                <div class="hero-text">
+                    <h1>Convertim-nos en científics i científiques de dades!</h1>
+                    <p>
+                        Centres educatius de Catalunya han construït les seves pròpies estacions meteorològiques
+                        amb <strong>micro:bit</strong>, <strong>ESP32</strong> i altres plaques.
+                        Consulta les dades en temps real o <a href="alta.html" style="color:inherit;font-weight:700;">afegeix la teva estació</a> a la xarxa.
+                    </p>
+                </div>
                 <div class="hero-stats">
                     <div class="stat-item"><span class="stat-number" id="statStations">–</span><span class="stat-label">Estacions</span></div>
                     <div class="stat-item"><span class="stat-number" id="statOnline">–</span><span class="stat-label">Amb dades avui</span></div>
-                    <div class="stat-item"><span class="stat-number">24/7</span><span class="stat-label">Dades en Temps Real</span></div>
+                    <div class="stat-item"><span class="stat-number">24/7</span><span class="stat-label">Dades en temps real</span></div>
                 </div>
             </div>
         </div>
@@ -102,65 +80,10 @@
             </div>
         </div>
     </section>
-
-    <!-- Sobre el projecte -->
-    <section class="schools-section" id="projecte">
-        <div class="container">
-            <div class="section-title">
-                <h2>📚 Sobre el Projecte</h2>
-                <p>Aprenentatge basat en projectes reals</p>
-            </div>
-            <div class="schools-grid">
-                <div class="school-card" style="cursor: default;">
-                    <div class="school-card-header" style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);"><div class="school-icon">🔧</div></div>
-                    <div class="school-card-body">
-                        <h3>Construcció</h3>
-                        <p>L'alumnat munta l'estació amb micro:bit, ESP32 o altres plaques, i hi connecta els sensors.</p>
-                    </div>
-                </div>
-                <div class="school-card" style="cursor: default;">
-                    <div class="school-card-header" style="background: linear-gradient(135deg, #d299c2 0%, #fef9d7 100%);"><div class="school-icon">💻</div></div>
-                    <div class="school-card-body">
-                        <h3>Programació</h3>
-                        <p>Amb blocs, Python o Arduino programen la placa perquè enviï les dades automàticament a ThingSpeak.</p>
-                    </div>
-                </div>
-                <div class="school-card" style="cursor: default;">
-                    <div class="school-card-header" style="background: linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%);"><div class="school-icon">📊</div></div>
-                    <div class="school-card-body">
-                        <h3>Anàlisi de Dades</h3>
-                        <p>Les dades queden arxivades en un full de càlcul: es poden graficar i comparar entre centres.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Footer -->
-    <footer class="footer">
-        <div class="container">
-            <div style="text-align: center; padding: 2rem 0;">
-                <img src="Logos 4.0.png" alt="Código Escuela 4.0 - Programa finançat pel Ministeri d'Educació amb suport de la Generalitat de Catalunya" style="max-width: 100%; height: auto;">
-            </div>
-            <div id="contacte" style="text-align: center; padding-bottom: 2rem;">
-                <span>Autor: <a href="mailto:anin1@xtec.cat" style="color:#60a5fa;font-weight:600;">Anton Nin Nin</a></span>
-                <br>
-                <a rel="license" href="https://creativecommons.org/licenses/by-nc-nd/4.0/" style="display:inline-block;margin-top:0.5rem;">
-                    <img alt="Llicència de Creative Commons" style="border-width:0;vertical-align:middle;height:32px;" src="https://licensebuttons.net/l/by-nc-nd/4.0/88x31.png" />
-                </a>
-                <br>
-                <span style="font-size:0.9em; color:var(--gray-500);">Aquesta obra està subjecta a una <a href="https://creativecommons.org/licenses/by-nc-nd/4.0/" target="_blank" rel="noopener" style="color:#60a5fa;">llicència CC BY-NC-ND 4.0</a>. Cal permís exprés per copiar o reutilitzar el material.</span>
-            </div>
-        </div>
-    </footer>
-
-    <!-- Demo Mode Toggle -->
-    <button class="demo-toggle" id="demoToggle" onclick="toggleDemoMode()" title="Activa/Desactiva Mode Demo">
-        <span class="demo-toggle-icon">🔬</span>
-        <span class="demo-toggle-text">Demo</span>
-    </button>
+    <div id="site-footer"></div>
 
     <!-- Scripts -->
+    <script src="js/layout.js"></script>
     <script src="js/config.js"></script>
     <script src="js/boards.js"></script>
     <script src="js/stations.js"></script>
@@ -168,8 +91,6 @@
     <script src="js/demo-data.js"></script>
     <script src="js/catalonia-map.js"></script>
     <script>
-        function toggleMenu() { document.getElementById('mainNav').classList.toggle('open'); }
-
         // Plegar/desplegar el llistat d'estacions
         document.addEventListener('DOMContentLoaded', () => {
             const header = document.getElementById('school-list-header');

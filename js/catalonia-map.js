@@ -373,6 +373,11 @@ class CataloniaMap {
     renderStationList(stations) {
         const list = document.getElementById('school-list');
         if (!list) return;
+        if (!stations.length) {
+            list.innerHTML = '<li>Encara no hi ha cap estació. <a href="alta.html">Afegeix la primera →</a></li>';
+            document.dispatchEvent(new CustomEvent('stations-rendered', { detail: { count: 0 } }));
+            return;
+        }
         list.innerHTML = stations.map(st => `
             <li data-station-id="${st.id}">
                 <a class="school-name" href="estacio.html?id=${encodeURIComponent(st.id)}">${st.icon} ${st.name}</a>
